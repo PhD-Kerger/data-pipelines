@@ -1,0 +1,16 @@
+services:
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: data-pipelines
+    volumes:
+      - .:/app
+    working_dir: /app
+    networks:
+      - phd-network
+
+networks:
+  phd-network:
+    driver: bridge
+    external: true
