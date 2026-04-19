@@ -50,39 +50,47 @@ class OSMLanduse:
         """Fetch landuse data from OSM for the specified cities"""
         landuse_data = {}
         for city in self.cities:
-            self.logger.info(f"Processing landuse data for city: {city}")
-            gdf = ox.features_from_place(city, self.tags)
+            try:
+                self.logger.info(f"Processing landuse data for city: {city}")
+                gdf = ox.features_from_place(city, self.tags)
 
-            # Keep only polygons
-            gdf = gdf[gdf.geometry.type.isin(["Polygon", "MultiPolygon"])]
+                # Keep only polygons
+                gdf = gdf[gdf.geometry.type.isin(["Polygon", "MultiPolygon"])]
 
-            # Keep relevant columns
-            gdf = gdf[["landuse", "geometry"]]
+                # Keep relevant columns
+                gdf = gdf[["landuse", "geometry"]]
 
-            landuse_data[city] = gdf
+                landuse_data[city] = gdf
 
-            self.logger.info(f"Fetched landuse data for {city} with tags: {self.tags}")
+                self.logger.info(
+                    f"Fetched landuse data for {city} with tags: {self.tags}"
+                )
+            except Exception as e:
+                self.logger.error(f"Error fetching landuse data for {city}: {e}")
+                # add a info line in a additional log file to track which city and year had issues
+                with open(
+                    Path(self.extension_data_dir_path) / "osm_errors.log", "a"
+                ) as error_log:
+                    error_log.write(f"Landuse - {city}\n")
         return landuse_data
 
     def _save_landuse_data(self, landuse_data):
         """Save landuse GeoDataFrames as a single Parquet file"""
-        output_file = os.path.join(
-            self.extension_data_dir_path, "osm_landuse.parquet"
-        )
+        output_file = os.path.join(self.extension_data_dir_path, "osm_landuse.parquet")
 
         # Collect all data from all cities
         all_ids = []
         all_cities = []
         all_landuses = []
         all_geometries = []
-        
+
         current_id = 1
         for city, gdf in landuse_data.items():
             # Reset index to avoid saving element/id as index columns
             gdf = gdf.reset_index(drop=True)
-            
+
             num_rows = len(gdf)
-            
+
             # Add data for this city
             all_ids.extend(range(current_id, current_id + num_rows))
             all_cities.extend([city] * num_rows)
@@ -92,7 +100,7 @@ class OSMLanduse:
                 .apply(lambda geom: geom.wkb if geom is not None else None)
                 .tolist()
             )
-            
+
             current_id += num_rows
             self.logger.info(f"Added {num_rows} landuse features for {city}")
 
@@ -105,12 +113,14 @@ class OSMLanduse:
         }
 
         # Define schema with geoarrow WKB type for PostGIS compatibility
-        schema = pa.schema([
-            pa.field("id", pa.int64()),
-            pa.field("city", pa.string()),
-            pa.field("landuse", pa.string()),
-            pa.field("area", ga.wkb()),
-        ])
+        schema = pa.schema(
+            [
+                pa.field("id", pa.int64()),
+                pa.field("city", pa.string()),
+                pa.field("landuse", pa.string()),
+                pa.field("area", ga.wkb()),
+            ]
+        )
 
         # Create PyArrow table with proper schema
         table = pa.Table.from_pydict(formatted_data, schema=schema)
@@ -118,4 +128,6 @@ class OSMLanduse:
         # Write to Parquet file
         pq.write_table(table, output_file, compression="BROTLI")
 
-        self.logger.info(f"Saved landuse data for all cities ({len(all_ids)} total features) to {output_file}")
+        self.logger.info(
+            f"Saved landuse data for all cities ({len(all_ids)} total features) to {output_file}"
+        )

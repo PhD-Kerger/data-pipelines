@@ -207,7 +207,7 @@ class OSM:
 
     def _get_osm_entities(self):
         """Get OSM entities for all configured tags"""
-        api = overpy.Overpass()
+        api = overpy.Overpass(url="https://overpass.kumi.systems/api/interpreter")
 
         for tag in self.tags:
             if tag not in self.OSM_CONFIG:
@@ -224,16 +224,13 @@ class OSM:
                 for year in self.years:
                     self.logger.info(f"Fetching {tag} data for {city} in {year}")
                     try:
-                        time.sleep(2)  # Rate limiting for OSM API
-
                         # Build OSM query
                         query = f"""
-                        [out:json][date:"{year}-01-01T12:00:00Z"];
+                        [out:json];
                         area({area_id});
                         node(area)["{config['osm_key']}"="{config['osm_value']}"];
                         out;
                         """
-
                         result = api.query(query)
 
                         for node in result.nodes:
@@ -262,10 +259,20 @@ class OSM:
 
                             self.osm_entities[tag].append(entity_data)
 
+                        self.logger.info(
+                            f"Fetched {len(result.nodes)} {tag} entities for {city} in {year}"
+                        )
+                        time.sleep(2)  # Sleep to respect API rate limits
+
                     except Exception as e:
                         self.logger.error(
                             f"Error processing {tag} for {city} in {year}: {e}"
                         )
+                        # add a info line in a additional log file to track which city and year had issues
+                        with open(
+                            Path(self.extension_data_dir_path) / "osm_errors.log", "a"
+                        ) as error_log:
+                            error_log.write(f"{tag} - {city}\n")
                         continue
 
         self.logger.info("OSM data collection completed")
@@ -402,18 +409,21 @@ class OSM:
             if existing_file.exists():
                 self.logger.info("OSM parquet file already exists. Merging new data.")
                 # read existing data
-                existing_table = pq.read_table(existing_file, schema=pa.schema(
-                    [
-                        pa.field("id", pa.int32()),
-                        pa.field("timestamp", pa.timestamp("s", tz="UTC")),
-                        pa.field("location_id", pa.int32()),
-                        pa.field("entity_name", pa.string()),
-                        pa.field("name", pa.string()),
-                        pa.field("cuisine", pa.string()),
-                        pa.field("opening_hours", pa.string()),
-                    ]
-                ))
-                
+                existing_table = pq.read_table(
+                    existing_file,
+                    schema=pa.schema(
+                        [
+                            pa.field("id", pa.int32()),
+                            pa.field("timestamp", pa.timestamp("s", tz="UTC")),
+                            pa.field("location_id", pa.int32()),
+                            pa.field("entity_name", pa.string()),
+                            pa.field("name", pa.string()),
+                            pa.field("cuisine", pa.string()),
+                            pa.field("opening_hours", pa.string()),
+                        ]
+                    ),
+                )
+
                 # get max id
                 existing_ids = existing_table.column("id").to_pylist()
                 if existing_ids:
@@ -457,7 +467,7 @@ class OSM:
             names = [r["name"] for r in export_data]
             cuisines = [r["cuisine"] for r in export_data]
             opening_hours = [r["opening_hours"] for r in export_data]
-            
+
             schema = pa.schema(
                 [
                     pa.field("id", pa.int32()),
@@ -469,7 +479,7 @@ class OSM:
                     pa.field("opening_hours", pa.string()),
                 ]
             )
-            
+
             osm_table = pa.table(
                 {
                     "id": pa.array(ids, type=pa.int32()),

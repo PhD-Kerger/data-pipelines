@@ -3,6 +3,7 @@ from pathlib import Path
 import requests
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pyarrow_ops as pa_ops
 import datetime
 
 
@@ -145,11 +146,37 @@ class Holidays:
 
         os.makedirs(self.extension_data_dir_path, exist_ok=True)
 
-        pq.write_table(
+        output_file = Path(self.extension_data_dir_path) / "holidays.parquet"
+
+        # If the target file already exists, merge existing and new rows first.
+        if output_file.exists():
+            existing_table = pq.read_table(output_file)
+            table = pa.concat_tables([existing_table, table])
+
+        # Remove duplicates after merge to keep only one row per holiday record.
+        table = pa_ops.drop_duplicates(
             table,
-            f"{self.extension_data_dir_path}/holidays.parquet",
-            compression="BROTLI",
+            [
+                "name",
+                "start_date",
+                "country_name",
+                "federal_state_name",
+                "end_date",
+                "type",
+            ],
+            keep="first",
         )
+
+        table = table.sort_by(
+            [
+                ("country_name", "ascending"),
+                ("federal_state_name", "ascending"),
+                ("start_date", "ascending"),
+                ("name", "ascending"),
+            ]
+        )
+
+        pq.write_table(table, output_file, compression="BROTLI")
 
     def subdivision_code_mapper(self, subdivision_code):
         """Maps subdivision codes to their correct corresponding names.
