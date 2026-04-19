@@ -1,12 +1,9 @@
 from pathlib import Path
 import yaml
-import os
-import time
 
 from operators import Nextbike, Tier, GBFS
 from extensions import (
     Holidays,
-    Vacations,
     OSM,
     OSMLanduse,
     Geo,
@@ -85,7 +82,6 @@ class DataPipelineManager:
 
         self.extension_class_mapping = {
             "Holidays": Holidays,
-            "Vacations": Vacations,
             "OSM": OSM,
             "OSMLanduse": OSMLanduse,
             "Weather": Weather,

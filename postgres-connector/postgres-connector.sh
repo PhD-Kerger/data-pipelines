@@ -8,7 +8,7 @@ if [ $# -lt 1 ]; then
   echo "Usage: $0 <datatype> [operator(s)]"
   echo "Supported data types:"
   echo "  - demand, availability, trips (require operators)"
-  echo "  - weather, osm, osm_landuse, foursquare, holidays, vacations, gtfs, wfs, demographics_MA (standalone), bike_count_stations"
+  echo "  - weather, osm, osm_landuse, foursquare, holidays, gtfs, wfs, demographics_MA (standalone), bike_count_stations"
   echo "  - geo (metadata only - also auto-updated when needed)"
   echo ""
   echo "Note: geo metadata (geo_information, station_names) is automatically"
@@ -36,7 +36,6 @@ declare -A TABLE_MAP=(
   [osm_landuse]=osm_landuse
   [foursquare]=foursquare
   [holidays]=holidays
-  [vacations]=vacations
   [gtfs]=gtfs
   [wfs]=wfs
   [demographics_MA]=demographics
@@ -182,7 +181,7 @@ process_datatype() {
       log INFO "Processing operator-based datatype: $datatype"
       process_operator_based_data "$datatype" "$target_table"
       ;;
-    "weather"|"osm"|"osm_landuse"|"foursquare"|"holidays"|"vacations"|"gtfs"|"wfs"|"demographics_MA"|"bike_count_stations")
+    "weather"|"osm"|"osm_landuse"|"foursquare"|"holidays"|"gtfs"|"wfs"|"demographics_MA"|"bike_count_stations")
       process_standalone_data "$datatype" "$target_table"
       ;;
   esac
@@ -227,9 +226,6 @@ process_standalone_data() {
       local data_path="$EXTENSION_DIR/$datatype"
       ;;
     "holidays")
-      local data_path="$EXTENSION_DIR/$datatype"
-      ;;
-    "vacations")
       local data_path="$EXTENSION_DIR/$datatype"
       ;;
     "gtfs")
