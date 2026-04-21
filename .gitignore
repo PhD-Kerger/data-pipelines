@@ -181,3 +181,5 @@ mobility_data.duckdb
 tests/
 *.json
 *.png
+
+env.yaml

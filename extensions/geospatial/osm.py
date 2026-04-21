@@ -223,6 +223,7 @@ class OSM:
 
                 for year in self.years:
                     self.logger.info(f"Fetching {tag} data for {city} in {year}")
+                    time.sleep(1.5)  # Sleep to respect API rate limits
                     try:
                         # Build OSM query
                         query = f"""
@@ -262,7 +263,6 @@ class OSM:
                         self.logger.info(
                             f"Fetched {len(result.nodes)} {tag} entities for {city} in {year}"
                         )
-                        time.sleep(2)  # Sleep to respect API rate limits
 
                     except Exception as e:
                         self.logger.error(

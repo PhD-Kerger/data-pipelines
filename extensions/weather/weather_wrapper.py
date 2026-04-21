@@ -5,6 +5,7 @@ from extensions.weather.mannheim_weather_stations import MannheimWeatherStations
 from extensions.weather.stuttgart_weather_stations import StuttgartWeatherStations
 from utils.data_pipeline_logger import DataPipelineLogger
 from extensions.weather.dwd import DWD
+from extensions.weather.openmeteo import OpenMeteo
 
 
 class Weather:
@@ -15,6 +16,7 @@ class Weather:
         "dwd": DWD,
         "mannheim": MannheimWeatherStations,
         "stuttgart": StuttgartWeatherStations,
+        "openmeteo": OpenMeteo,
     }
 
     def __init__(
@@ -25,7 +27,7 @@ class Weather:
         logs_data_dir_path,
         start_date,
         end_date,
-        cities,
+        locations,
         weather_source,
     ):
         # Setup logger
@@ -54,7 +56,7 @@ class Weather:
             logs_data_dir_path=logs_data_dir_path,
             start_date=start_date,
             end_date=end_date,
-            cities=cities,
+            locations=locations,
         )
 
     def run(self):

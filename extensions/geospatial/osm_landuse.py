@@ -3,6 +3,7 @@ from pathlib import Path
 import osmnx as ox
 import pyarrow as pa
 import pyarrow.parquet as pq
+import pyarrow_ops as pa_ops
 import geoarrow.pyarrow as ga
 
 from utils.data_pipeline_logger import DataPipelineLogger
@@ -78,13 +79,26 @@ class OSMLanduse:
         """Save landuse GeoDataFrames as a single Parquet file"""
         output_file = os.path.join(self.extension_data_dir_path, "osm_landuse.parquet")
 
+        existing_table = None
+        current_id = 1
+        if os.path.exists(output_file):
+            try:
+                existing_table = pq.read_table(output_file)
+                self.logger.info(
+                    "OSM landuse parquet file already exists. Appending new data before deduplication and id reset."
+                )
+            except Exception as e:
+                self.logger.error(
+                    f"Error reading existing landuse parquet file {output_file}: {e}"
+                )
+                return
+
         # Collect all data from all cities
         all_ids = []
         all_cities = []
         all_landuses = []
         all_geometries = []
 
-        current_id = 1
         for city, gdf in landuse_data.items():
             # Reset index to avoid saving element/id as index columns
             gdf = gdf.reset_index(drop=True)
@@ -103,6 +117,10 @@ class OSMLanduse:
 
             current_id += num_rows
             self.logger.info(f"Added {num_rows} landuse features for {city}")
+
+        if not all_ids:
+            self.logger.warning("No new landuse data to export")
+            return
 
         # Prepare combined data dictionary with WKB geometry
         formatted_data = {
@@ -125,7 +143,21 @@ class OSMLanduse:
         # Create PyArrow table with proper schema
         table = pa.Table.from_pydict(formatted_data, schema=schema)
 
-        # Write to Parquet file
+        if existing_table is not None:
+            table = pa.concat_tables([existing_table, table])
+
+        table = pa_ops.drop_duplicates(table, ["city", "landuse", "area"], keep="first")
+
+        table = pa.Table.from_arrays(
+            [
+                pa.array(range(1, table.num_rows + 1), type=pa.int64()),
+                table.column("city"),
+                table.column("landuse"),
+                table.column("area"),
+            ],
+            names=["id", "city", "landuse", "area"],
+        )
+
         pq.write_table(table, output_file, compression="BROTLI")
 
         self.logger.info(

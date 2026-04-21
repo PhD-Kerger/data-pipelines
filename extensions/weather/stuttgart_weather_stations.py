@@ -24,7 +24,7 @@ class StuttgartWeatherStations:
         logs_data_dir_path,
         start_date,
         end_date,
-        cities,
+        locations,
     ):
         self.extension_data_dir_path = extension_data_dir_path + "/weather"
         self.meta_data_dir_path = meta_data_dir_path

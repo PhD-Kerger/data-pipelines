@@ -52,7 +52,7 @@ class DWD:
         logs_data_dir_path,
         start_date,
         end_date,
-        cities,
+        locations,
     ):
         self.extension_data_dir_path = extension_data_dir_path + "/weather"
         self.meta_data_dir_path = meta_data_dir_path
@@ -69,7 +69,7 @@ class DWD:
 
         self.start_date = start_date
         self.end_date = end_date
-        self.cities = cities if cities else []
+        self.cities = locations if locations else []
 
         # Initialize data structures using class constants
         self.city_coordinates = []
