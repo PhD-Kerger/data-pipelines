@@ -177,7 +177,6 @@ cache/*
 !cache/
 mobility_data.duckdb
 *.pkl
-*.txt
 tests/
 *.json
 *.png
