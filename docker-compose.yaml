@@ -8,9 +8,9 @@ services:
       - .:/app
     working_dir: /app
     networks:
-      - phd-network
+      - mobility-network
 
 networks:
-  phd-network:
+  mobility-network:
     driver: bridge
     external: true
