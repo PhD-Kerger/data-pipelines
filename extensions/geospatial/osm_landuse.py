@@ -68,11 +68,6 @@ class OSMLanduse:
                 )
             except Exception as e:
                 self.logger.error(f"Error fetching landuse data for {city}: {e}")
-                # add a info line in a additional log file to track which city and year had issues
-                with open(
-                    Path(self.extension_data_dir_path) / "osm_errors.log", "a"
-                ) as error_log:
-                    error_log.write(f"Landuse - {city}\n")
         return landuse_data
 
     def _save_landuse_data(self, landuse_data):
@@ -158,7 +153,9 @@ class OSMLanduse:
             names=["id", "city", "landuse", "area"],
         )
 
-        pq.write_table(table, output_file, compression="BROTLI")
+        pq.write_table(
+            table, output_file, compression="BROTLI", max_rows_per_page=2147483647
+        )
 
         self.logger.info(
             f"Saved landuse data for all cities ({len(all_ids)} total features) to {output_file}"

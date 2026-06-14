@@ -25,6 +25,7 @@ class StuttgartWeatherStations:
         start_date,
         end_date,
         locations,
+        url=None,
     ):
         self.extension_data_dir_path = extension_data_dir_path + "/weather"
         self.meta_data_dir_path = meta_data_dir_path
@@ -479,10 +480,10 @@ class StuttgartWeatherStations:
                     existing_data = pq.read_table(coordinates_file)
                     combined_data = pa.concat_tables([existing_data, new_data])
                     pq.write_table(
-                        combined_data, coordinates_file, compression="BROTLI"
+                        combined_data, coordinates_file, compression="BROTLI", max_rows_per_page=2147483647
                     )
                 else:
-                    pq.write_table(new_data, coordinates_file, compression="BROTLI")
+                    pq.write_table(new_data, coordinates_file, compression="BROTLI", max_rows_per_page=2147483647)
 
                 self.logger.info(f"Saved coordinates to {coordinates_file}")
 
@@ -595,7 +596,7 @@ class StuttgartWeatherStations:
             if output_file.exists():
                 output_file.unlink()
 
-            pq.write_table(weather_table, output_file, compression="BROTLI")
+            pq.write_table(weather_table, output_file, compression="BROTLI", max_rows_per_page=2147483647)
 
             # delete the tmp folder
             if Path(self.extension_temp_dir_path).exists():

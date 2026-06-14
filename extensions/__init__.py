@@ -5,7 +5,6 @@ from .demographics.demographics_mannheim import Demographics_MA
 from .geospatial.osm import OSM
 from .geospatial.osm_landuse import OSMLanduse
 from .geospatial.geo import Geo
-from .geospatial.fourquare import Foursquare
 from .geospatial.wfs import WFS
 
 from .seasonal.holidays import Holidays
@@ -22,7 +21,6 @@ __all__ = [
     "Holidays",
     "Geo",
     "GTFS",
-    "Foursquare",
     "WFS",
     "Demographics_MA",
     "BikeCountStationsGermany",

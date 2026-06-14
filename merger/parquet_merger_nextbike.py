@@ -301,7 +301,12 @@ class ParquetMergerNextbike:
             )
             merged_table = pc.take(merged_table, sort_indices)
 
-            pq.write_table(merged_table, output_file_path, compression="BROTLI")
+            pq.write_table(
+                merged_table,
+                output_file_path,
+                compression="BROTLI",
+                max_rows_per_page=2147483647,
+            )
             self.logger.info(
                 f"Merged parquet file written to {output_file_path} for operator {operator}"
             )

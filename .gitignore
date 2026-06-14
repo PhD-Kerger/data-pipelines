@@ -172,9 +172,6 @@ cython_debug/
 
 data/*
 cache/*
-!data/metadata/
-!data/internal/
-!cache/
 mobility_data.duckdb
 *.pkl
 tests/

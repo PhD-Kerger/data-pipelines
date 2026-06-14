@@ -118,5 +118,5 @@ class Demographics_MA:
 
         table = pa.Table.from_pylist(all_records, schema=schema)
         pq.write_table(
-            table, self.extension_data_dir_path + "/demographics_mannheim.parquet", compression="BROTLI"
+            table, self.extension_data_dir_path + "/demographics_mannheim.parquet", compression="BROTLI", max_rows_per_page=2147483647
         )

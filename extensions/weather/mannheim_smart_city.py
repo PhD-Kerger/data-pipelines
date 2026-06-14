@@ -28,6 +28,7 @@ class MannheimSmartCityWeatherExtension:
         start_date,
         end_date,
         locations,
+        url=None,
     ):
         self.extension_data_dir_path = extension_data_dir_path + "/weather"
         self.meta_data_dir_path = meta_data_dir_path
@@ -311,10 +312,10 @@ class MannheimSmartCityWeatherExtension:
                     existing_data = pq.read_table(coordinates_file)
                     combined_data = pa.concat_tables([existing_data, new_data])
                     pq.write_table(
-                        combined_data, coordinates_file, compression="BROTLI"
+                        combined_data, coordinates_file, compression="BROTLI", max_rows_per_page=2147483647
                     )
                 else:
-                    pq.write_table(new_data, coordinates_file, compression="BROTLI")
+                    pq.write_table(new_data, coordinates_file, compression="BROTLI", max_rows_per_page=2147483647)
 
                 self.logger.info(f"Saved coordinates to {coordinates_file}")
 
@@ -587,7 +588,7 @@ class MannheimSmartCityWeatherExtension:
             # Delete existing file if it exists
             if os.path.exists(output_parquet):
                 os.remove(output_parquet)
-            pq.write_table(combined_table, output_parquet, compression="BROTLI")
+            pq.write_table(combined_table, output_parquet, compression="BROTLI", max_rows_per_page=2147483647)
             self.logger.info(f"Saved combined weather data to {output_parquet}")
             
             # Clean up temp directory

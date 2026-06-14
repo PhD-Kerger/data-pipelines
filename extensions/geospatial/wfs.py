@@ -112,7 +112,9 @@ class WFS:
 
         pq.write_table(
             table,
-            self.extension_data_dir_path + "/" + self.wfs_name + ".parquet", compression="BROTLI"
+            self.extension_data_dir_path + "/" + self.wfs_name + ".parquet",
+            compression="BROTLI",
+            max_rows_per_page=2147483647,
         )
         self.logger.info(
             f"Saved formatted Parquet file to {self.extension_data_dir_path + '/' + self.wfs_name + '.parquet'}"

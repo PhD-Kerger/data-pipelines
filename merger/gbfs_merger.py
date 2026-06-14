@@ -116,9 +116,7 @@ class GBFSMerger:
             self.logger.info(
                 f"Merging vehicle_status from {input_dir_1} and {input_dir_2} to {output_dir} for operator {operator_name}"
             )
-            ParquetMergerGBFS(
-                log_file_path=self.log_file
-            ).merge_parquet_files_by_date(
+            ParquetMergerGBFS(log_file_path=self.log_file).merge_parquet_files_by_date(
                 free_bike_status_dir_1,
                 Path(input_dir_1, "vehicle_status"),
                 os.path.join(self.tmp_dir, inputer_1, "vehicle_status"),
@@ -163,9 +161,7 @@ class GBFSMerger:
             self.logger.info(
                 f"Merging vehicle_status from {input_dir_1} and {input_dir_2} to {output_dir} for operator {operator_name}"
             )
-            ParquetMergerGBFS(
-                log_file_path=self.log_file
-            ).merge_parquet_files_by_date(
+            ParquetMergerGBFS(log_file_path=self.log_file).merge_parquet_files_by_date(
                 free_bike_status_dir_2,
                 Path(input_dir_2, "vehicle_status"),
                 os.path.join(self.tmp_dir, inputer_2, "vehicle_status"),

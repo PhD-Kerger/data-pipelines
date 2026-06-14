@@ -24,6 +24,7 @@ class OpenMeteo:
         start_date,
         end_date,
         locations,
+        url=None,
     ):
         self.extension_data_dir_path = extension_data_dir_path + "/weather"
         self.meta_data_dir_path = meta_data_dir_path
@@ -42,6 +43,8 @@ class OpenMeteo:
         self.end_date = end_date
         # locations is a list of [lat, lon] pairs
         self.locations = locations if locations else []
+        
+        self.url = url or "https://archive-api.open-meteo.com/v1/archive"
 
         # Setup the Open-Meteo API client with cache and retry on error
         self.cache_session = requests_cache.CachedSession(
@@ -87,8 +90,6 @@ class OpenMeteo:
 
     def fetch_weather_data(self):
         """Fetch weather data from Open-Meteo API for all locations in batches."""
-        url = "https://archive-api.open-meteo.com/v1/archive"
-
         self.weather_data = []
         batch_size = 100
 
@@ -118,7 +119,7 @@ class OpenMeteo:
             }
 
             try:
-                responses = self.openmeteo.weather_api(url, params=params)
+                responses = self.openmeteo.weather_api(self.url, params=params)
 
                 for idx, response in enumerate(responses):
                     lat = lats[idx]
@@ -238,9 +239,9 @@ class OpenMeteo:
                 existing_table = pq.read_table(coordinates_file)
                 # Combine tables
                 combined_table = pa.concat_tables([existing_table, new_table])
-                pq.write_table(combined_table, coordinates_file)
+                pq.write_table(combined_table, coordinates_file, max_rows_per_page=2147483647)
             else:
-                pq.write_table(new_table, coordinates_file)
+                pq.write_table(new_table, coordinates_file, max_rows_per_page=2147483647)
 
         except Exception as e:
             self.logger.error(f"Error updating location coordinates: {e}")
@@ -354,7 +355,7 @@ class OpenMeteo:
                     [("location_id", "ascending"), ("timestamp", "ascending")]
                 )
 
-            pq.write_table(weather_table, output_file, compression="BROTLI")
+            pq.write_table(weather_table, output_file, compression="BROTLI", max_rows_per_page=2147483647)
 
             # Clean up tmp folder
             if Path(self.extension_temp_dir_path).exists():

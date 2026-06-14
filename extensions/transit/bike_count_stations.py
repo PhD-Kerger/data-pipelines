@@ -216,10 +216,18 @@ class BikeCountStationsGermany:
                     existing_data = pq.read_table(coordinates_file)
                     combined_data = pa.concat_tables([existing_data, new_data])
                     pq.write_table(
-                        combined_data, coordinates_file, compression="BROTLI"
+                        combined_data,
+                        coordinates_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
                     )
                 else:
-                    pq.write_table(new_data, coordinates_file, compression="BROTLI")
+                    pq.write_table(
+                        new_data,
+                        coordinates_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
 
                 self.logger.info(f"Saved coordinates to {coordinates_file}")
 
@@ -332,7 +340,12 @@ class BikeCountStationsGermany:
             # Write to parquet file
             output_file = Path(self.extension_data_dir_path) / "bike_counts.parquet"
 
-            pq.write_table(osm_table, output_file, compression="BROTLI")
+            pq.write_table(
+                osm_table,
+                output_file,
+                compression="BROTLI",
+                max_rows_per_page=2147483647,
+            )
 
             self.logger.info(
                 f"Exported {len(export_data)} bike count records to {output_file}"

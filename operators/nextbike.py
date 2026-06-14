@@ -133,11 +133,9 @@ class Nextbike:
                     )
                     countries_filter = f"WHERE name IN ({network_list})"
 
-                con.execute(
-                    f"""CREATE OR REPLACE TABLE countries AS 
+                con.execute(f"""CREATE OR REPLACE TABLE countries AS 
                     SELECT DISTINCT ON (name, timestamp) * FROM read_parquet([{', '.join([f'\'{path}\'' for path in country_paths])}])
-                    {countries_filter}"""
-                )
+                    {countries_filter}""")
                 row_count = con.execute("SELECT COUNT(*) FROM countries").fetchone()[0]
                 self.logger.info(f"countries table contains {row_count} rows")
 
@@ -161,24 +159,20 @@ class Nextbike:
                     else ""
                 )
 
-                con.execute(
-                    f"""CREATE OR REPLACE TABLE cities AS 
+                con.execute(f"""CREATE OR REPLACE TABLE cities AS 
                     SELECT DISTINCT ON (c.uid, c.timestamp) c.* FROM read_parquet([{', '.join([f'\'{path}\'' for path in city_paths])}]) c
-                    {cities_filter}"""
-                )
+                    {cities_filter}""")
                 row_count = con.execute("SELECT COUNT(*) FROM cities").fetchone()[0]
                 self.logger.info(f"cities table contains {row_count} rows")
 
             # Create places table with filtering based on cities
             if place_paths and city_paths:
-                con.execute(
-                    f"""CREATE OR REPLACE TABLE places AS 
+                con.execute(f"""CREATE OR REPLACE TABLE places AS 
                     SELECT DISTINCT ON (p.uid, p.timestamp) p.* FROM read_parquet([{', '.join([f'\'{path}\'' for path in place_paths])}]) p
                     WHERE EXISTS (
                         SELECT 1 FROM cities c 
                         WHERE p.city_uid = c.uid AND p.timestamp = c.timestamp
-                    )"""
-                )
+                    )""")
                 row_count = con.execute("SELECT COUNT(*) FROM places").fetchone()[0]
                 self.logger.info(f"places table contains {row_count} rows")
             elif place_paths:
@@ -190,14 +184,12 @@ class Nextbike:
 
             # Create bikes table with filtering based on places
             if bike_paths and place_paths:
-                con.execute(
-                    f"""CREATE OR REPLACE TABLE bikes AS 
+                con.execute(f"""CREATE OR REPLACE TABLE bikes AS 
                     SELECT DISTINCT ON (b.number, b.timestamp) b.* FROM read_parquet([{', '.join([f'\'{path}\'' for path in bike_paths])}]) b
                     WHERE EXISTS (
                         SELECT 1 FROM places p 
                         WHERE b.place_uid = p.uid AND b.timestamp = p.timestamp
-                    )"""
-                )
+                    )""")
                 row_count = con.execute("SELECT COUNT(*) FROM bikes").fetchone()[0]
                 self.logger.info(f"bikes table contains {row_count} rows")
             elif bike_paths:
@@ -293,12 +285,10 @@ class Nextbike:
                 if not new_coords:
                     self.logger.info("No new coordinates to add")
                     # Still create the DuckDB table from existing file
-                    self.db_connection.execute(
-                        f"""
+                    self.db_connection.execute(f"""
                         CREATE OR REPLACE TABLE location_coordinates AS
                         SELECT * FROM parquet_scan('{coordinates_file}')
-                        """
-                    )
+                        """)
                     return
 
                 self.logger.info(
@@ -326,20 +316,26 @@ class Nextbike:
                     existing_data = pq.read_table(coordinates_file)
                     combined_data = pa.concat_tables([existing_data, new_data])
                     pq.write_table(
-                        combined_data, coordinates_file, compression="BROTLI"
+                        combined_data,
+                        coordinates_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
                     )
                 else:
-                    pq.write_table(new_data, coordinates_file, compression="BROTLI")
+                    pq.write_table(
+                        new_data,
+                        coordinates_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
 
                 self.logger.info(f"Saved coordinates to {coordinates_file}")
 
             # Create DuckDB table from the parquet file
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 CREATE OR REPLACE TABLE location_coordinates AS
                 SELECT * FROM parquet_scan('{coordinates_file}')
-                """
-            )
+                """)
 
         except Exception as e:
             self.logger.error(f"Error extracting coordinates: {e}")
@@ -382,12 +378,10 @@ class Nextbike:
 
                 if not new_stations:
                     self.logger.info("No new station names to add")
-                    self.db_connection.execute(
-                        f"""
+                    self.db_connection.execute(f"""
                         CREATE OR REPLACE TABLE station_names AS
                         SELECT * FROM parquet_scan('{station_names_file}')
-                        """
-                    )
+                        """)
                     return
 
                 self.logger.info(
@@ -417,20 +411,26 @@ class Nextbike:
                     existing_data = pq.read_table(station_names_file)
                     combined_data = pa.concat_tables([existing_data, new_data])
                     pq.write_table(
-                        combined_data, station_names_file, compression="BROTLI"
+                        combined_data,
+                        station_names_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
                     )
                 else:
-                    pq.write_table(new_data, station_names_file, compression="BROTLI")
+                    pq.write_table(
+                        new_data,
+                        station_names_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
 
                 self.logger.info(f"Saved station names to {station_names_file}")
 
             # Create DuckDB table from the parquet file
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 CREATE OR REPLACE TABLE station_names AS
                 SELECT * FROM parquet_scan('{station_names_file}')
-                """
-            )
+                """)
 
         except Exception as e:
             self.logger.error(f"Error extracting station names: {e}")
@@ -599,13 +599,23 @@ class Nextbike:
                     deduped_table = pa_ops.drop_duplicates(
                         combined_data, key_columns, keep="first"
                     )
-                    pq.write_table(deduped_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        deduped_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Added {len(trips_table)} trip records to existing file {filename}"
                     )
                 else:
                     # Create new file
-                    pq.write_table(trips_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        trips_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Created {filename} with {len(trips_table)} trip records"
                     )
@@ -759,13 +769,23 @@ class Nextbike:
                     deduped_table = pa_ops.drop_duplicates(
                         combined_data, key_columns, keep="first"
                     )
-                    pq.write_table(deduped_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        deduped_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Added {len(demand_table)} demand records to existing file {filename}"
                     )
                 else:
                     # Create new file
-                    pq.write_table(demand_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        demand_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Created {filename} with {len(demand_table)} demand records"
                     )
@@ -892,13 +912,23 @@ class Nextbike:
                         combined_data, key_columns, keep="first"
                     )
 
-                    pq.write_table(deduped_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        deduped_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Added {len(availability_table)} availability records to existing file {filename}"
                     )
                 else:
                     # Create new file
-                    pq.write_table(availability_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        availability_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Created {filename} with {len(availability_table)} availability records"
                     )

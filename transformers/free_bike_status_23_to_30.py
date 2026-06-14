@@ -104,7 +104,12 @@ class FreeBikeStatusTransformer:
             os.makedirs(os.path.dirname(output_path), exist_ok=True)
 
             try:
-                pq.write_table(table, output_path, compression="BROTLI")
+                pq.write_table(
+                    table,
+                    output_path,
+                    compression="BROTLI",
+                    max_rows_per_page=2147483647,
+                )
             except Exception as e:
                 self.logger.error(
                     f"Error writing parquet file {output_path}: {e} for operator {self.operator}."

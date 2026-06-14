@@ -274,7 +274,9 @@ class Tier:
         vehicle_paths = []
 
         for date_dir in sorted(date_dirs):
-            vehicles_file = os.path.join(date_dir, f"{os.path.basename(date_dir)}.parquet")
+            vehicles_file = os.path.join(
+                date_dir, f"{os.path.basename(date_dir)}.parquet"
+            )
 
             if os.path.exists(vehicles_file):
                 vehicle_paths.append(vehicles_file)
@@ -310,13 +312,11 @@ class Tier:
             self.logger.info(f"Applying filters: {filter_conditions}")
 
             # Create filtered view
-            con.execute(
-                f"""
+            con.execute(f"""
                 CREATE OR REPLACE VIEW vehicles AS 
                 SELECT * FROM vehicles_raw
                 WHERE 1=1 {filter_conditions}
-            """
-            )
+            """)
             # get number of rows in vehicles view
             row_count = con.execute("SELECT COUNT(*) FROM vehicles").fetchone()[0]
             self.logger.info(f"filtered vehicles view contains {row_count} rows")
@@ -386,12 +386,10 @@ class Tier:
                 if not new_coords:
                     self.logger.info("No new coordinates to add")
                     # Still create the DuckDB table from existing file
-                    self.db_connection.execute(
-                        f"""
+                    self.db_connection.execute(f"""
                         CREATE OR REPLACE TABLE location_coordinates AS
                         SELECT * FROM parquet_scan('{coordinates_file}')
-                        """
-                    )
+                        """)
                     return
 
                 self.logger.info(
@@ -418,19 +416,27 @@ class Tier:
                 if coordinates_file.exists():
                     existing_data = pq.read_table(coordinates_file)
                     combined_data = pa.concat_tables([existing_data, new_data])
-                    pq.write_table(combined_data, coordinates_file, compression="BROTLI")
+                    pq.write_table(
+                        combined_data,
+                        coordinates_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                 else:
-                    pq.write_table(new_data, coordinates_file, compression="BROTLI")
+                    pq.write_table(
+                        new_data,
+                        coordinates_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
 
                 self.logger.info(f"Saved coordinates to {coordinates_file}")
 
             # Create DuckDB table from the parquet file
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 CREATE OR REPLACE TABLE location_coordinates AS
                 SELECT * FROM parquet_scan('{coordinates_file}')
-                """
-            )
+                """)
 
         except Exception as e:
             self.logger.error(f"Error extracting coordinates: {e}")
@@ -449,7 +455,7 @@ class Tier:
         """Generate trips from the vehicles table and save to daily parquet files"""
         try:
             self.logger.info("Starting trip generation...")
-            
+
             query = f"""
             WITH filtered_vehicles AS (
                 SELECT
@@ -518,7 +524,7 @@ class Tier:
             ORDER BY vehicle_id, timestamp_lend;
             """
             result_sql = self.db_connection.execute(query)
-            
+
             result = result_sql.fetch_arrow_table()
 
             if result.num_rows == 0:
@@ -549,7 +555,9 @@ class Tier:
                 daily_table = daily_table.select(columns_to_keep)
 
                 # Add predicted column
-                predicted_col = pa.array([False] * daily_table.num_rows, type=pa.bool_())
+                predicted_col = pa.array(
+                    [False] * daily_table.num_rows, type=pa.bool_()
+                )
                 daily_table = daily_table.append_column("predicted", predicted_col)
 
                 # Save to parquet file named by date
@@ -569,13 +577,23 @@ class Tier:
                     deduped_table = pa_ops.drop_duplicates(
                         combined_data, key_columns, keep="first"
                     )
-                    pq.write_table(deduped_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        deduped_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Added {daily_table.num_rows} trip records to existing file {filename}"
                     )
                 else:
                     # Create new file
-                    pq.write_table(daily_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        daily_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Created {filename} with {daily_table.num_rows} trip records"
                     )
@@ -708,13 +726,23 @@ class Tier:
                     deduped_table = pa_ops.drop_duplicates(
                         combined_data, key_columns, keep="first"
                     )
-                    pq.write_table(deduped_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        deduped_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Added {daily_table.num_rows} demand records to existing file {filename}"
                     )
                 else:
                     # Create new file
-                    pq.write_table(daily_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        daily_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Created {filename} with {daily_table.num_rows} demand records"
                     )
@@ -796,7 +824,9 @@ class Tier:
 
                 # Drop the availability_date column
                 column_names = daily_table.schema.names
-                columns_to_keep = [col for col in column_names if col != "availability_date"]
+                columns_to_keep = [
+                    col for col in column_names if col != "availability_date"
+                ]
                 daily_table = daily_table.select(columns_to_keep)
 
                 # Save to parquet file named by date
@@ -816,13 +846,23 @@ class Tier:
                     deduped_table = pa_ops.drop_duplicates(
                         combined_data, key_columns, keep="first"
                     )
-                    pq.write_table(deduped_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        deduped_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Added {daily_table.num_rows} availability records to existing file {filename}"
                     )
                 else:
                     # Create new file
-                    pq.write_table(daily_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        daily_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Created {filename} with {daily_table.num_rows} availability records"
                     )

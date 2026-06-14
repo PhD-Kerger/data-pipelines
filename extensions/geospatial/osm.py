@@ -207,7 +207,7 @@ class OSM:
 
     def _get_osm_entities(self):
         """Get OSM entities for all configured tags"""
-        api = overpy.Overpass(url="https://overpass.kumi.systems/api/interpreter")
+        api = overpy.Overpass()
 
         for tag in self.tags:
             if tag not in self.OSM_CONFIG:
@@ -223,15 +223,17 @@ class OSM:
 
                 for year in self.years:
                     self.logger.info(f"Fetching {tag} data for {city} in {year}")
-                    time.sleep(1.5)  # Sleep to respect API rate limits
                     try:
+                        time.sleep(3)  # Rate limiting for OSM API
+
                         # Build OSM query
                         query = f"""
-                        [out:json];
+                        [out:json][date:"{year}-01-01T12:00:00Z"];
                         area({area_id});
                         node(area)["{config['osm_key']}"="{config['osm_value']}"];
                         out;
                         """
+
                         result = api.query(query)
 
                         for node in result.nodes:
@@ -260,19 +262,10 @@ class OSM:
 
                             self.osm_entities[tag].append(entity_data)
 
-                        self.logger.info(
-                            f"Fetched {len(result.nodes)} {tag} entities for {city} in {year}"
-                        )
-
                     except Exception as e:
                         self.logger.error(
                             f"Error processing {tag} for {city} in {year}: {e}"
                         )
-                        # add a info line in a additional log file to track which city and year had issues
-                        with open(
-                            Path(self.extension_data_dir_path) / "osm_errors.log", "a"
-                        ) as error_log:
-                            error_log.write(f"{tag} - {city}\n")
                         continue
 
         self.logger.info("OSM data collection completed")
@@ -348,10 +341,18 @@ class OSM:
                     existing_data = pq.read_table(coordinates_file)
                     combined_data = pa.concat_tables([existing_data, new_data])
                     pq.write_table(
-                        combined_data, coordinates_file, compression="BROTLI"
+                        combined_data,
+                        coordinates_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
                     )
                 else:
-                    pq.write_table(new_data, coordinates_file, compression="BROTLI")
+                    pq.write_table(
+                        new_data,
+                        coordinates_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
 
                 self.logger.info(f"Saved coordinates to {coordinates_file}")
 
@@ -499,9 +500,19 @@ class OSM:
             if existing_file.exists():
                 # Merge with existing data
                 combined_table = pa.concat_tables([existing_table, osm_table])
-                pq.write_table(combined_table, output_file, compression="BROTLI")
+                pq.write_table(
+                    combined_table,
+                    output_file,
+                    compression="BROTLI",
+                    max_rows_per_page=2147483647,
+                )
             else:
-                pq.write_table(osm_table, output_file, compression="BROTLI")
+                pq.write_table(
+                    osm_table,
+                    output_file,
+                    compression="BROTLI",
+                    max_rows_per_page=2147483647,
+                )
 
             self.logger.info(
                 f"Exported {len(export_data)} OSM records to {output_file}"

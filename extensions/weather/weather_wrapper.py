@@ -29,6 +29,7 @@ class Weather:
         end_date,
         locations,
         weather_source,
+        url=None,
     ):
         # Setup logger
         self.logger = DataPipelineLogger.get_logger(
@@ -57,6 +58,7 @@ class Weather:
             start_date=start_date,
             end_date=end_date,
             locations=locations,
+            url=url,
         )
 
     def run(self):

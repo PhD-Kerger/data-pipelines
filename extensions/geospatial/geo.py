@@ -1,13 +1,10 @@
 import os
-import time
 from pathlib import Path
 from shapely.geometry import Point
-from geopy.geocoders import Nominatim
 import duckdb
 import requests
 import pyarrow as pa
 import pyarrow.parquet as pq
-import pyarrow.compute as pc
 import geopandas as gpd
 from tqdm import tqdm
 import numpy as np
@@ -34,14 +31,9 @@ class Geo:
 
         # Load shapefiles with proper paths
         geodata_path = Path("./data/internal/geodata")
-        self.CONTINENTS = gpd.read_file(geodata_path / "continents/continents.shp")
-        self.COUNTRIES = gpd.read_file(geodata_path / "countries/countries.shp")
-        self.FEDERAL_STATES = gpd.read_file(
-            geodata_path / "federal_states/federal_states.shp"
-        )
-        self.POSTAL_CODES = gpd.read_file(
+        self.SPATIAL_SHP = gpd.read_file(
             geodata_path
-            / "postal_codes_with_federal_states/postal_codes_with_federal_states.shp"
+            / "World_Administrative_Divisions/World_Administrative_Divisions.shp"
         )
 
         # Initialize geocoder cache for better performance
@@ -81,31 +73,13 @@ class Geo:
         try:
             # Convert to appropriate CRS for better performance (WGS84)
             # Handle cases where CRS is not set (None) by setting it first
-            if self.CONTINENTS.crs is None:
-                self.CONTINENTS = self.CONTINENTS.set_crs("EPSG:4326")
-            elif self.CONTINENTS.crs != "EPSG:4326":
-                self.CONTINENTS = self.CONTINENTS.to_crs("EPSG:4326")
-
-            if self.COUNTRIES.crs is None:
-                self.COUNTRIES = self.COUNTRIES.set_crs("EPSG:4326")
-            elif self.COUNTRIES.crs != "EPSG:4326":
-                self.COUNTRIES = self.COUNTRIES.to_crs("EPSG:4326")
-
-            if self.FEDERAL_STATES.crs is None:
-                self.FEDERAL_STATES = self.FEDERAL_STATES.set_crs("EPSG:4326")
-            elif self.FEDERAL_STATES.crs != "EPSG:4326":
-                self.FEDERAL_STATES = self.FEDERAL_STATES.to_crs("EPSG:4326")
-
-            if self.POSTAL_CODES.crs is None:
-                self.POSTAL_CODES = self.POSTAL_CODES.set_crs("EPSG:4326")
-            elif self.POSTAL_CODES.crs != "EPSG:4326":
-                self.POSTAL_CODES = self.POSTAL_CODES.to_crs("EPSG:4326")
+            if self.SPATIAL_SHP.crs is None:
+                self.SPATIAL_SHP = self.SPATIAL_SHP.set_crs("EPSG:4326")
+            elif self.SPATIAL_SHP.crs != "EPSG:4326":
+                self.SPATIAL_SHP = self.SPATIAL_SHP.to_crs("EPSG:4326")
 
             # Create spatial indices
-            self.CONTINENTS.sindex
-            self.COUNTRIES.sindex
-            self.FEDERAL_STATES.sindex
-            self.POSTAL_CODES.sindex
+            self.SPATIAL_SHP.sindex
 
             self.logger.info("Shapefiles optimized successfully")
 
@@ -195,51 +169,6 @@ class Geo:
         except Exception as e:
             self.logger.warning(f"Failed to save elevation cache: {e}")
 
-    def _spatial_lookup(self, lat, lng, shapefile, name_column):
-        """Efficient spatial lookup using spatial index."""
-        try:
-            point = Point(lng, lat)
-
-            # Check if the column exists
-            if name_column not in shapefile.columns:
-                self.logger.warning(f"Column {name_column} not found in shapefile")
-                return ""
-
-            # Use spatial index for faster querying
-            possible_matches_index = list(shapefile.sindex.intersection(point.bounds))
-            possible_matches = shapefile.iloc[possible_matches_index]
-
-            # Check actual containment
-            precise_matches = possible_matches[possible_matches.contains(point)]
-
-            if not precise_matches.empty:
-                return precise_matches.iloc[0][name_column]
-            return ""
-
-        except Exception as e:
-            self.logger.warning(f"Spatial lookup failed for {lat}, {lng}: {e}")
-            return ""
-
-    def _get_continent_name(self, lat, lng):
-        """Get continent name from coordinates."""
-        return self._spatial_lookup(lat, lng, self.CONTINENTS, "CONTINENT")
-
-    def _get_country_name(self, lat, lng):
-        """Get country name from coordinates."""
-        return self._spatial_lookup(lat, lng, self.COUNTRIES, "ADMIN")
-
-    def _get_federal_state_name(self, lat, lng):
-        """Get federal state name from coordinates."""
-        return self._spatial_lookup(lat, lng, self.FEDERAL_STATES, "GEN")
-
-    def _get_postal_code(self, lat, lng):
-        """Get postal code from coordinates."""
-        try:
-            result = self._spatial_lookup(lat, lng, self.POSTAL_CODES, "plz")
-            return int(result) if result and str(result).isdigit() else 0
-        except (ValueError, TypeError):
-            return 0
-
     def run(self):
         """Main entry point for geo processing."""
         self.logger.info("Starting geo information processing...")
@@ -274,8 +203,7 @@ class Geo:
                 return
 
             self.logger.info("Loading coordinate data...")
-            conn.execute(
-                f"""
+            conn.execute(f"""
                 CREATE TABLE coordinates AS 
                 SELECT DISTINCT 
                     ROW_NUMBER() OVER () as location_id,
@@ -283,8 +211,7 @@ class Geo:
                     lng,
                     ST_Point(lng, lat) as location
                 FROM read_parquet('{coordinates_file}')
-            """
-            )
+            """)
 
             # Load existing geo information if available
             geo_info_file = (
@@ -315,9 +242,7 @@ class Geo:
                 # Extract other columns
                 continent_col = existing_table["continent_name"].to_pylist()
                 country_col = existing_table["country_name"].to_pylist()
-                city_col = existing_table["city_name"].to_pylist()
                 federal_state_col = existing_table["federal_state_name"].to_pylist()
-                postal_code_col = existing_table["postal_code"].to_pylist()
                 elevation_col = existing_table["elevation"].to_pylist()
 
                 # Ensure all lists have the same length
@@ -326,9 +251,7 @@ class Geo:
                     len(lng_col),
                     len(continent_col),
                     len(country_col),
-                    len(city_col),
                     len(federal_state_col),
-                    len(postal_code_col),
                     len(elevation_col),
                 )
 
@@ -349,9 +272,7 @@ class Geo:
                     existing_data[key] = {
                         "continent_name": continent_col[i] or "",
                         "country_name": country_col[i] or "",
-                        "city_name": city_col[i] or "",
                         "federal_state_name": federal_state_col[i] or "",
-                        "postal_code": postal_code_col[i] or 0,
                         "elevation": elevation_col[i] or None,
                     }
 
@@ -391,6 +312,7 @@ class Geo:
                 geo_table,
                 self.extension_data_dir_path + "/geo_information.parquet",
                 compression="BROTLI",
+                max_rows_per_page=2147483647,  # Set max rows per page to avoid row group splitting
             )
             self.logger.info(f"Saved geo information to {geo_info_file}")
 
@@ -469,7 +391,7 @@ class Geo:
                         elevation = None  # Default value if lookup fails
 
                 elevations.append(elevation)
-            
+
             # Add elevation column to geo table
             geo_table = geo_table.append_column(
                 "elevation", pa.array(elevations, pa.int16())
@@ -480,6 +402,7 @@ class Geo:
                 geo_table,
                 self.extension_data_dir_path + "/geo_information.parquet",
                 compression="BROTLI",
+                max_rows_per_page=2147483647,  # Set max rows per page to avoid row group splitting
             )
             self.logger.info("Saved updated geo information with elevation to parquet.")
 
@@ -553,52 +476,32 @@ class Geo:
 
         # Perform batch spatial lookups
         continents = self._batch_spatial_lookup(
-            lats, lngs, self.CONTINENTS, "CONTINENT"
+            lats, lngs, self.SPATIAL_SHP, "CONTINENT"
         )
-        countries = self._batch_spatial_lookup(lats, lngs, self.COUNTRIES, "ADMIN")
+        countries = self._batch_spatial_lookup(lats, lngs, self.SPATIAL_SHP, "ISO_CC")
         federal_states = self._batch_spatial_lookup(
-            lats, lngs, self.FEDERAL_STATES, "GEN"
+            lats, lngs, self.SPATIAL_SHP, "ISO_SUB"
         )
-        postal_codes = self._batch_spatial_lookup(
-            lats, lngs, self.POSTAL_CODES, "plz", is_numeric=True
-        )
+        # federal states are in format "ISO_CC-ISO_SUB", we want to combine country and federal state for better caching
+        federal_states = [
+            f"{countries[i]}-{federal_states[i]}" if federal_states[i] else ""
+            for i in range(len(federal_states))
+        ]
 
         self.logger.info(
             f"Completed batch spatial lookups for {len(coords_list)} coordinate groups"
         )
 
-        # Process city names (still need individual API calls, but only for representatives)
-        for i, group_key in enumerate(tqdm(coords_list, desc="Geocoding city names")):
-            lat, lng = group_key
-
-            try:
-                # Get city name using existing geocoding method
-                city_name = self._get_city_name(lat, lng)
-
-                # Combine all results
-                group_results[group_key] = {
-                    "continent_name": continents[i],
-                    "country_name": countries[i],
-                    "city_name": city_name,
-                    "federal_state_name": federal_states[i],
-                    "postal_code": postal_codes[i],
-                    "elevation": None,  # Placeholder, will be filled later
-                }
-
-                # Add small delay to respect API rate limits
-                time.sleep(0.1)  # 100ms delay between requests
-
-            except Exception as e:
-                self.logger.warning(f"Failed to geocode group {group_key}: {e}")
-                # Use default values for failed geocoding
-                group_results[group_key] = {
-                    "continent_name": continents[i],
-                    "country_name": countries[i],
-                    "city_name": "",
-                    "federal_state_name": federal_states[i],
-                    "postal_code": postal_codes[i],
-                    "elevation": None,  # Placeholder, will be filled later
-                }
+        for i, group_key in enumerate(
+            tqdm(coords_list, desc="Geocoding representative coordinates")
+        ):
+            # Combine all results
+            group_results[group_key] = {
+                "continent_name": continents[i],
+                "country_name": countries[i],
+                "federal_state_name": federal_states[i],
+                "elevation": None,  # Placeholder, will be filled later
+            }
 
         return group_results
 
@@ -612,7 +515,11 @@ class Geo:
             # Create points for all coordinates
             points = [Point(lng, lat) for lat, lng in zip(lats, lngs)]
 
-            for point in points:
+            for point in tqdm(
+                points,
+                desc=f"Batch spatial lookup for {name_column}",
+                total=len(points),
+            ):
                 try:
                     # Use spatial index for faster querying
                     possible_matches_index = list(
@@ -660,9 +567,7 @@ class Geo:
         # Initialize with default values using numpy
         continent_names = np.full(n_coords, "", dtype=object)
         country_names = np.full(n_coords, "", dtype=object)
-        city_names = np.full(n_coords, "", dtype=object)
         federal_state_names = np.full(n_coords, "", dtype=object)
-        postal_codes = np.zeros(n_coords, dtype=int)
         elevations = np.full(n_coords, None, dtype=object)
 
         # Create vectorized lookup for existing data
@@ -684,9 +589,7 @@ class Geo:
             cached_data = existing_data[key]
             continent_names[idx] = cached_data["continent_name"]
             country_names[idx] = cached_data["country_name"]
-            city_names[idx] = cached_data["city_name"]
             federal_state_names[idx] = cached_data["federal_state_name"]
-            postal_codes[idx] = cached_data["postal_code"]
             elevations[idx] = cached_data["elevation"]
 
         # Process new coordinates by groups more efficiently
@@ -721,9 +624,7 @@ class Geo:
             for idx in group_indices:
                 continent_names[idx] = geo_info["continent_name"]
                 country_names[idx] = geo_info["country_name"]
-                city_names[idx] = geo_info["city_name"]
                 federal_state_names[idx] = geo_info["federal_state_name"]
-                postal_codes[idx] = geo_info["postal_code"]
                 elevations[idx] = geo_info["elevation"]
 
         return {
@@ -731,119 +632,6 @@ class Geo:
             "location": locations_out,
             "continent_name": continent_names.tolist(),
             "country_name": country_names.tolist(),
-            "city_name": city_names.tolist(),
             "federal_state_name": federal_state_names.tolist(),
-            "postal_code": postal_codes.tolist(),
             "elevation": elevations.tolist(),
         }
-
-    def _get_geo_info_for_point(self, lat, lng):
-        """Get geographical information for a specific point using efficient spatial lookups."""
-        try:
-            # Default values
-            geo_info = {
-                "continent_name": "",
-                "country_name": "",
-                "city_name": "",
-                "federal_state_name": "",
-                "postal_code": 0,
-                "elevation": None,
-            }
-
-            # Use spatial lookups for continent, country, federal state, and postal code
-            try:
-                geo_info["continent_name"] = self._get_continent_name(lat, lng)
-                geo_info["country_name"] = self._get_country_name(lat, lng)
-                geo_info["federal_state_name"] = self._get_federal_state_name(lat, lng)
-                geo_info["postal_code"] = self._get_postal_code(lat, lng)
-                geo_info["elevation"] = None  # Placeholder, will be filled later
-            except Exception as e:
-                self.logger.warning(f"Failed to get spatial info for {lat}, {lng}: {e}")
-
-            # Try to get city name using geocoding (fallback)
-            try:
-                city_name = self._get_city_name(lat, lng)
-                geo_info["city_name"] = city_name
-            except Exception as e:
-                self.logger.warning(f"Failed to get city name for {lat}, {lng}: {e}")
-
-            return geo_info
-
-        except Exception as e:
-            self.logger.error(f"Error getting geo info for {lat}, {lng}: {e}")
-            return {
-                "continent_name": "",
-                "country_name": "",
-                "city_name": "",
-                "federal_state_name": "",
-                "postal_code": 0,
-                "elevation": None,
-            }
-
-    def _get_city_name(self, lat, lon):
-        """Get the city name from the coordinates with enhanced caching and efficiency."""
-        # Round coordinates for caching (reduces API calls for nearby points)
-        # Use 3 decimal precision to match existing data lookup - use numpy for consistency
-        # Convert to Python float for consistent key types
-        # Use (lat, lng) order to match existing data format
-        cache_key = (float(np.round(lat, 3)), float(np.round(lon, 3)))
-
-        if cache_key in self._geocoder_cache:
-            return self._geocoder_cache[cache_key]
-
-        # Also check for nearby cached results within a reasonable distance
-        for cached_key, cached_result in self._geocoder_cache.items():
-            cached_lat, cached_lon = cached_key
-            # If within ~1km, use cached result
-            if abs(cached_lat - lat) < 0.01 and abs(cached_lon - lon) < 0.01:
-                self._geocoder_cache[cache_key] = cached_result
-                return cached_result
-
-        try:
-            # Initialize geolocator if not already done
-            if self._geolocator is None:
-                self._geolocator = Nominatim(
-                    user_agent="geo_processor_v2",
-                    timeout=10,  # Increase timeout for better reliability
-                )
-
-            # Use more specific language and addressdetails for better results
-            location = self._geolocator.reverse(
-                (lat, lon),
-                exactly_one=True,
-                language="en",  # Consistent language
-                addressdetails=True,
-            )
-
-            if location and location.raw:
-                address = location.raw.get("address", {})
-
-                # Try multiple address components in order of preference
-                city = (
-                    address.get("city")
-                    or address.get("town")
-                    or address.get("village")
-                    or address.get("municipality")
-                    or address.get("suburb")
-                    or ""
-                )
-
-                result = city.strip() if city else ""
-            else:
-                result = ""
-
-            # Cache the result
-            self._geocoder_cache[cache_key] = result
-
-            # Also cache for the broader area to improve future lookups
-            broader_key = (float(np.round(lat, 2)), float(np.round(lon, 2)))
-            if broader_key not in self._geocoder_cache:
-                self._geocoder_cache[broader_key] = result
-
-            return result
-
-        except Exception as e:
-            self.logger.warning(f"Geocoding failed for {lat}, {lon}: {e}")
-            # Cache empty result to avoid repeated failures
-            self._geocoder_cache[cache_key] = ""
-            return ""

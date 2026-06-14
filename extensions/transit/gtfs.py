@@ -99,8 +99,7 @@ class GTFS:
 
         try:
             # Create main GTFS table with proper types
-            main_conn.execute(
-                """
+            main_conn.execute("""
                 CREATE TABLE gtfs (
                     route_long_name VARCHAR,
                     route_short_name VARCHAR,
@@ -109,8 +108,7 @@ class GTFS:
                     arrival_time TIMESTAMP,
                     departure_time TIMESTAMP
                 )
-            """
-            )
+            """)
 
             # Process each ZIP file and insert data
             for zip_file in gtfs_zip_files:
@@ -169,6 +167,7 @@ class GTFS:
                         self.extension_data_dir_path
                         / zip_file.replace(".zip", ".parquet"),
                         compression="BROTLI",
+                        max_rows_per_page=2147483647,
                     )
                 else:
                     self.logger.warning("No GTFS data processed")
@@ -291,44 +290,34 @@ class GTFS:
 
         try:
             # Load stops
-            conn.execute(
-                f"""
+            conn.execute(f"""
                 CREATE TABLE stops AS 
                 SELECT * FROM read_csv('{folder_path / "stops.txt"}', {csv_options})
-            """
-            )
+            """)
 
             # Load stop_times
-            conn.execute(
-                f"""
+            conn.execute(f"""
                 CREATE TABLE stop_times AS 
                 SELECT * FROM read_csv('{folder_path / "stop_times.txt"}', {csv_options})
-            """
-            )
+            """)
 
             # Load trips
-            conn.execute(
-                f"""
+            conn.execute(f"""
                 CREATE TABLE trips AS 
                 SELECT * FROM read_csv('{folder_path / "trips.txt"}', {csv_options})
-            """
-            )
+            """)
 
             # Load routes
-            conn.execute(
-                f"""
+            conn.execute(f"""
                 CREATE TABLE routes AS 
                 SELECT * FROM read_csv('{folder_path / "routes.txt"}', {csv_options})
-            """
-            )
+            """)
 
             # Load calendar
-            conn.execute(
-                f"""
+            conn.execute(f"""
                 CREATE TABLE calendar AS 
                 SELECT * FROM read_csv('{folder_path / "calendar.txt"}', {csv_options})
-            """
-            )
+            """)
 
             self.logger.info("Successfully loaded all GTFS files")
 
@@ -339,49 +328,39 @@ class GTFS:
 
             try:
                 # Load stops
-                conn.execute(
-                    f"""
+                conn.execute(f"""
                     CREATE TABLE stops AS 
                     SELECT * FROM read_csv_auto('{folder_path / "stops.txt"}', 
                         ignore_errors=true, null_padding=true)
-                """
-                )
+                """)
 
                 # Load stop_times
-                conn.execute(
-                    f"""
+                conn.execute(f"""
                     CREATE TABLE stop_times AS 
                     SELECT * FROM read_csv_auto('{folder_path / "stop_times.txt"}', 
                         ignore_errors=true, null_padding=true)
-                """
-                )
+                """)
 
                 # Load trips
-                conn.execute(
-                    f"""
+                conn.execute(f"""
                     CREATE TABLE trips AS 
                     SELECT * FROM read_csv_auto('{folder_path / "trips.txt"}', 
                         ignore_errors=true, null_padding=true)
-                """
-                )
+                """)
 
                 # Load routes
-                conn.execute(
-                    f"""
+                conn.execute(f"""
                     CREATE TABLE routes AS 
                     SELECT * FROM read_csv_auto('{folder_path / "routes.txt"}', 
                         ignore_errors=true, null_padding=true)
-                """
-                )
+                """)
 
                 # Load calendar
-                conn.execute(
-                    f"""
+                conn.execute(f"""
                     CREATE TABLE calendar AS 
                     SELECT * FROM read_csv_auto('{folder_path / "calendar.txt"}', 
                         ignore_errors=true, null_padding=true)
-                """
-                )
+                """)
 
                 self.logger.info("Successfully loaded GTFS files with read_csv_auto")
 
@@ -394,8 +373,7 @@ class GTFS:
     def _filter_stops_by_location(self, conn):
         """Filter stops by geographic location using spatial queries."""
         # Get stops with valid coordinates - handle empty strings and non-numeric values
-        stops_result = conn.execute(
-            """
+        stops_result = conn.execute("""
             SELECT stop_id, stop_name, 
                    CAST(stop_lat AS DOUBLE) as lat, 
                    CAST(stop_lon AS DOUBLE) as lng
@@ -408,8 +386,7 @@ class GTFS:
             AND TRY_CAST(stop_lon AS DOUBLE) IS NOT NULL
             AND TRY_CAST(stop_lat AS DOUBLE) BETWEEN -90 AND 90
             AND TRY_CAST(stop_lon AS DOUBLE) BETWEEN -180 AND 180
-        """
-        ).fetchall()
+        """).fetchall()
 
         filtered_stops = []
         lock = threading.Lock()
@@ -561,7 +538,12 @@ class GTFS:
                 existing_data = pq.read_table(coordinates_file)
                 combined_data = pa.concat_tables([existing_data, new_data])
 
-                pq.write_table(combined_data, coordinates_file, compression="BROTLI")
+                pq.write_table(
+                    combined_data,
+                    coordinates_file,
+                    compression="BROTLI",
+                    max_rows_per_page=2147483647,
+                )
             else:
                 self.logger.info("No new coordinates to add")
 
@@ -582,7 +564,12 @@ class GTFS:
             new_table = pa.table(
                 {"location_id": new_location_ids, "lat": new_lats, "lng": new_lngs}
             )
-            pq.write_table(new_table, coordinates_file, compression="BROTLI")
+            pq.write_table(
+                new_table,
+                coordinates_file,
+                compression="BROTLI",
+                max_rows_per_page=2147483647,
+            )
 
         # Map stop coordinates to location IDs
         for stop in filtered_stops:
@@ -603,8 +590,7 @@ class GTFS:
         )
 
         # Get merged GTFS data using SQL
-        gtfs_result = conn.execute(
-            f"""
+        gtfs_result = conn.execute(f"""
             SELECT 
                 r.route_long_name,
                 r.route_short_name,
@@ -628,8 +614,7 @@ class GTFS:
             AND LENGTH(TRIM(CAST(st.departure_time AS VARCHAR))) >= 8
             AND CAST(st.arrival_time AS VARCHAR) LIKE '%:%:%'
             AND CAST(st.departure_time AS VARCHAR) LIKE '%:%:%'
-        """
-        ).fetchall()
+        """).fetchall()
 
         gtfs_data = []
 
@@ -657,7 +642,7 @@ class GTFS:
                 start_dt = datetime.strptime(str(start_date), "%Y%m%d")
                 end_dt = datetime.strptime(str(end_date), "%Y%m%d")
 
-                # Parse times                
+                # Parse times
                 arrival_parts = str(arrival_time).split(":")
                 departure_parts = str(departure_time).split(":")
 

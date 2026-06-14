@@ -176,7 +176,9 @@ class Holidays:
             ]
         )
 
-        pq.write_table(table, output_file, compression="BROTLI")
+        pq.write_table(
+            table, output_file, compression="BROTLI", max_rows_per_page=2147483647
+        )
 
     def subdivision_code_mapper(self, subdivision_code):
         """Maps subdivision codes to their correct corresponding names.

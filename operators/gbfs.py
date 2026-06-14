@@ -318,60 +318,48 @@ class GBFS:
         if self.operator == "voi":
             # The rental_uri_ios looks like this: https://lqfa.adj.st/closest_vehicle?adj_t=b2hnabv&adj_deep_link=voiapp%3A%2F%2Fscooter%2Fnml8&adj_campaign=nvbw.de.
             # We can extract everyhing between "scooter%2" and "&adj_campaign" and set this as the new vehicle_id
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 UPDATE vehicles_raw
                 SET {self.id_text} = regexp_extract(rental_uri_ios, 'scooter%2F([^&]+)', 1)
                 WHERE rental_uri_ios LIKE '%scooter%2F%'
-                """
-            )
+                """)
         elif self.operator == "dott":
             # remove DOC:Vehicle: prefix from vehicle_id if present. MobidataBW feed has this prefix, official Dott GBFS does not have it.
             # Results in different vehicle ids for same vehicle which break distinct statements.
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 UPDATE vehicles_raw
                 SET {self.id_text} = REPLACE({self.id_text}, 'DOC:Vehicle:', '')
                 WHERE {self.id_text} LIKE 'DOC:Vehicle:%'
-                """
-            )
+                """)
             # remove DOD:Vehicle: prefix from vehicle_id if present. MobidataBW feed has this prefix, official Dott GBFS does not have it.
             # Results in different vehicle ids for same vehicle which break distinct statements.
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 UPDATE vehicles_raw
                 SET {self.id_text} = REPLACE({self.id_text}, 'DOD:Vehicle:', '')
                 WHERE {self.id_text} LIKE 'DOD:Vehicle:%'
-                """
-            )
+                """)
             # remove DOG:Vehicle: prefix from vehicle_id if present. MobidataBW feed has this prefix, official Dott GBFS does not have it.
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 UPDATE vehicles_raw
                 SET {self.id_text} = REPLACE({self.id_text}, 'DOG:Vehicle:', '')
                 WHERE {self.id_text} LIKE 'DOG:Vehicle:%'
-                """
-            )
+                """)
             # remove DOJ:Vehicle: prefix from vehicle_id if present. MobidataBW feed has this prefix, official Dott GBFS does not have it.
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 UPDATE vehicles_raw
                 SET {self.id_text} = REPLACE({self.id_text}, 'DOJ:Vehicle:', '')
                 WHERE {self.id_text} LIKE 'DOJ:Vehicle:%'
-                """
-            )
+                """)
         elif self.operator == "bolt":
             # Bolt does not have anything that we can use
             pass
         elif self.operator == "lime":
             # "vehicle_id": "LMG:Vehicle:V4DBK7TZMQS2M": we remove the suffix LMG:Vehicle:
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 UPDATE vehicles_raw
                 SET {self.id_text} = REPLACE({self.id_text}, 'LMG:Vehicle:', '')
                 WHERE {self.id_text} LIKE 'LMG:Vehicle:%'
-                """
-            )
+                """)
         elif self.operator == "regioradstuttgart":
             self.logger.info(
                 "Overwriting vehicle IDs for RegioRadStuttgart based on rental_uri_ios"
@@ -379,39 +367,32 @@ class GBFS:
             # The rental_uri_ios looks like this: https://www.callabike.de/bike?number=12583
             # or https://www.regioradstuttgart.de/bike?number=13664
             # We can extract the number parameter in the end and set this as the new vehicle_id
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 UPDATE vehicles_raw
                 SET {self.id_text} = regexp_extract(rental_uri_ios, 'number=([0-9]+)', 1)
                 WHERE rental_uri_ios LIKE 'https://www.callabike.de/bike?number=%'
                    OR rental_uri_ios LIKE 'https://www.regioradstuttgart.de/bike?number=%'
-                """
-            )
+                """)
         elif self.operator == "callabike":
             # The rental_uri_ios looks like this: https://www.callabike.de/bike?number=12583
             # We can extract the number parameter in the end and set this as the new vehicle_id
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 UPDATE vehicles_raw
                 SET {self.id_text} = regexp_extract(rental_uri_ios, 'number=([0-9]+)', 1)
                 WHERE rental_uri_ios LIKE 'https://www.callabike.de/bike?number=%'
-                """
-            )
+                """)
         elif self.operator == "zeus":
             # The rental uri web looks like this: "https://zeus.city/api/v1/applinks?vehicle=5867"
             # We can extract the vehicle parameter in the end and set this as the new vehicle_id
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 UPDATE vehicles_raw
                 SET {self.id_text} = regexp_extract(rental_uri_web, 'vehicle=([0-9]+)', 1)
                 WHERE rental_uri_web LIKE 'https://zeus.city/api/v1/applinks?vehicle=%'
-                """
-            )
+                """)
 
     def _overwrite_station_id(self):
         """Overwrites the station id with a shorter integer id in the vehicles raw table with station_id_mappings table"""
-        self.db_connection.execute(
-            f"""
+        self.db_connection.execute(f"""
             UPDATE vehicles_raw
             SET station_id = (
                 SELECT new_station_id
@@ -419,8 +400,7 @@ class GBFS:
                 WHERE station_id_mappings.station_id = vehicles_raw.station_id
             )
             WHERE vehicles_raw.station_id IS NOT NULL;
-            """
-        )
+            """)
 
     def _initialize_database(self):
         """Initialize DuckDB database with views pointing to Parquet files"""
@@ -600,13 +580,11 @@ class GBFS:
             self.logger.info(f"Applying filters: {filter_conditions}")
 
             # Create filtered view
-            con.execute(
-                f"""
+            con.execute(f"""
                 CREATE OR REPLACE VIEW vehicles AS 
                 SELECT * FROM vehicles_raw
                 WHERE 1=1 {filter_conditions}
-            """
-            )
+            """)
             # get number of rows in vehicles view
             row_count = con.execute("SELECT COUNT(*) FROM vehicles").fetchone()[0]
             self.logger.info(f"filtered vehicles view contains {row_count} rows")
@@ -638,8 +616,7 @@ class GBFS:
             if self.operator == "regioradstuttgart" or self.operator == "callabike":
                 # RegioRadStuttgart and CallABike have station ids with prefix CAB:Station: that need to be removed,
                 # else we will have duplicates later on.
-                self.db_connection.execute(
-                    f"""
+                self.db_connection.execute(f"""
                     CREATE OR REPLACE TABLE station_information AS
                         WITH extracted_stations AS (
                             SELECT DISTINCT
@@ -651,15 +628,13 @@ class GBFS:
                         SELECT DISTINCT station_id, station_name
                         FROM extracted_stations
                         WHERE station_id IS NOT NULL AND station_name IS NOT NULL
-                    """
-                )
+                    """)
                 self.logger.info(
                     f"Station information table created successfully for {self.operator}"
                 )
             else:
                 # Default case for all other operators
-                self.db_connection.execute(
-                    f"""
+                self.db_connection.execute(f"""
                     CREATE OR REPLACE TABLE station_information AS
                         WITH extracted_stations AS (
                             SELECT DISTINCT
@@ -671,8 +646,7 @@ class GBFS:
                         SELECT DISTINCT station_id, station_name
                         FROM extracted_stations
                         WHERE station_id IS NOT NULL AND station_name IS NOT NULL
-                    """
-                )
+                    """)
                 self.logger.info(
                     "Default station information table created successfully"
                 )
@@ -724,12 +698,10 @@ class GBFS:
 
                 if not new_stations:
                     self.logger.info("No new station names to add")
-                    self.db_connection.execute(
-                        f"""
+                    self.db_connection.execute(f"""
                         CREATE OR REPLACE TABLE station_names AS
                         SELECT * FROM parquet_scan('{station_names_file}')
-                        """
-                    )
+                        """)
                     return
 
                 self.logger.info(
@@ -759,20 +731,26 @@ class GBFS:
                     existing_data = pq.read_table(station_names_file)
                     combined_data = pa.concat_tables([existing_data, new_data])
                     pq.write_table(
-                        combined_data, station_names_file, compression="BROTLI"
+                        combined_data,
+                        station_names_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
                     )
                 else:
-                    pq.write_table(new_data, station_names_file, compression="BROTLI")
+                    pq.write_table(
+                        new_data,
+                        station_names_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
 
                 self.logger.info(f"Saved station names to {station_names_file}")
 
             # Create DuckDB table from the parquet file
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 CREATE OR REPLACE TABLE station_names AS
                 SELECT * FROM parquet_scan('{station_names_file}')
-                """
-            )
+                """)
 
         except Exception as e:
             self.logger.error(f"Error creating station names table: {e}")
@@ -823,12 +801,10 @@ class GBFS:
                 if not new_coords:
                     self.logger.info("No new coordinates to add")
                     # Still create the DuckDB table from existing file
-                    self.db_connection.execute(
-                        f"""
+                    self.db_connection.execute(f"""
                         CREATE OR REPLACE TABLE location_coordinates AS
                         SELECT * FROM parquet_scan('{coordinates_file}')
-                        """
-                    )
+                        """)
                     return
 
                 self.logger.info(
@@ -856,20 +832,26 @@ class GBFS:
                     existing_data = pq.read_table(coordinates_file)
                     combined_data = pa.concat_tables([existing_data, new_data])
                     pq.write_table(
-                        combined_data, coordinates_file, compression="BROTLI"
+                        combined_data,
+                        coordinates_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
                     )
                 else:
-                    pq.write_table(new_data, coordinates_file, compression="BROTLI")
+                    pq.write_table(
+                        new_data,
+                        coordinates_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
 
                 self.logger.info(f"Saved coordinates to {coordinates_file}")
 
             # Create DuckDB table from the parquet file
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 CREATE OR REPLACE TABLE location_coordinates AS
                 SELECT * FROM parquet_scan('{coordinates_file}')
-                """
-            )
+                """)
 
         except Exception as e:
             self.logger.error(f"Error extracting coordinates: {e}")
@@ -919,12 +901,10 @@ class GBFS:
                 if not new_station_ids:
                     self.logger.info("No new station IDs to add")
                     # Still create the DuckDB table from existing file
-                    self.db_connection.execute(
-                        f"""
+                    self.db_connection.execute(f"""
                         CREATE OR REPLACE TABLE station_id_mappings AS
                         SELECT * FROM parquet_scan('{station_ids_file}')
-                        """
-                    )
+                        """)
                     return
 
                 self.logger.info(
@@ -952,20 +932,26 @@ class GBFS:
                     existing_data = pq.read_table(station_ids_file)
                     combined_data = pa.concat_tables([existing_data, new_data])
                     pq.write_table(
-                        combined_data, station_ids_file, compression="BROTLI"
+                        combined_data,
+                        station_ids_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
                     )
                 else:
-                    pq.write_table(new_data, station_ids_file, compression="BROTLI")
+                    pq.write_table(
+                        new_data,
+                        station_ids_file,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
 
                 self.logger.info(f"Saved station IDs to {station_ids_file}")
 
             # Create DuckDB table from the parquet file
-            self.db_connection.execute(
-                f"""
+            self.db_connection.execute(f"""
                 CREATE OR REPLACE TABLE station_id_mappings AS
                 SELECT * FROM parquet_scan('{station_ids_file}')
-                """
-            )
+                """)
 
         except Exception as e:
             self.logger.error(f"Error extracting station IDs: {e}")
@@ -1501,12 +1487,22 @@ class GBFS:
                     deduped_table = pa_ops.drop_duplicates(
                         combined_data, key_columns, keep="first"
                     )
-                    pq.write_table(deduped_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        deduped_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Added {trips_table.num_rows} trip records to existing file {filename}"
                     )
                 else:
-                    pq.write_table(trips_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        trips_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Created {filename} with {trips_table.num_rows} trip records"
                     )
@@ -1752,13 +1748,23 @@ class GBFS:
                         combined_data, key_columns, keep="first"
                     )
 
-                    pq.write_table(deduped_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        deduped_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Added {demand_table.num_rows} demand records to existing file {filename}"
                     )
                 else:
                     # Create new file
-                    pq.write_table(demand_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        demand_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Created {filename} with {demand_table.num_rows} demand records"
                     )
@@ -1881,13 +1887,23 @@ class GBFS:
                     deduped_table = pa_ops.drop_duplicates(
                         combined_data, key_columns, keep="first"
                     )
-                    pq.write_table(deduped_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        deduped_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Added {availability_table.num_rows} availability records to existing file {filename}"
                     )
                 else:
                     # Create new file
-                    pq.write_table(availability_table, file_path, compression="BROTLI")
+                    pq.write_table(
+                        availability_table,
+                        file_path,
+                        compression="BROTLI",
+                        max_rows_per_page=2147483647,
+                    )
                     self.logger.info(
                         f"Created {filename} with {availability_table.num_rows} availability records"
                     )
